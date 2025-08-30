@@ -1,48 +1,262 @@
-![Banner image](https://user-images.githubusercontent.com/10284570/173569848-c624317f-42b1-45a6-ab09-f0ea3c247648.png)
+# n8n-nodes-json-parser
 
-# n8n-nodes-starter
+[![npm version](https://badge.fury.io/js/n8n-nodes-json-parser.svg)](https://badge.fury.io/js/n8n-nodes-json-parser)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This repo contains example nodes to help you get started building your own custom integrations for [n8n](https://n8n.io). It includes the node linter and other dependencies.
+An n8n community node for extracting and parsing JSON from text, especially useful for processing AI model outputs that often embed JSON within conversational responses or markdown formatting.
 
-To make your custom node available to the community, you must create it as an npm package, and [submit it to the npm registry](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry).
+## Features
 
-If you would like your node to be available on n8n cloud you can also [submit your node for verification](https://docs.n8n.io/integrations/creating-nodes/deploy/submit-community-nodes/).
+🎯 **Multiple Extraction Methods**
+- Smart Detection - Automatically finds JSON in various formats
+- First/Last JSON Object - Extract specific occurrences
+- All JSON Objects - Extract multiple JSON structures
+- Between Markers - Custom delimiters (e.g., markdown code blocks)
+- Custom Regex - Advanced pattern matching
 
-## Prerequisites
+🔧 **Intelligent Parsing**
+- JSON5 support for relaxed syntax
+- Automatic fixing of common issues:
+  - Smart quotes → regular quotes
+  - Trailing comma removal
+  - Escape sequence correction
+- Schema validation with detailed error messages
 
-You need the following installed on your development machine:
+🤖 **AI-Ready**
+- Compatible with AI Agent nodes (`usableAsTool: true`)
+- Optimized for outputs from:
+  - Google Gemini
+  - OpenAI GPT
+  - Anthropic Claude
+  - And other AI models
 
-* [git](https://git-scm.com/downloads)
-* Node.js and npm. Minimum version Node 20. You can find instructions on how to install both using nvm (Node Version Manager) for Linux, Mac, and WSL [here](https://github.com/nvm-sh/nvm). For Windows users, refer to Microsoft's guide to [Install NodeJS on Windows](https://docs.microsoft.com/en-us/windows/dev-environment/javascript/nodejs-on-windows).
-* Install n8n with:
-  ```
-  npm install n8n -g
-  ```
-* Recommended: follow n8n's guide to [set up your development environment](https://docs.n8n.io/integrations/creating-nodes/build/node-development-environment/).
+## Installation
 
-## Using this starter
+### Via n8n UI (Recommended)
+1. Navigate to **Settings** → **Community Nodes**
+2. Click **Install a community node**
+3. Enter: `n8n-nodes-json-parser`
+4. Click **Install**
+5. Restart n8n
 
-These are the basic steps for working with the starter. For detailed guidance on creating and publishing nodes, refer to the [documentation](https://docs.n8n.io/integrations/creating-nodes/).
+### Via npm
+```bash
+cd /path/to/n8n
+npm install n8n-nodes-json-parser
+```
 
-1. [Generate a new repository](https://github.com/n8n-io/n8n-nodes-starter/generate) from this template repository.
-2. Clone your new repo:
-   ```
-   git clone https://github.com/<your organization>/<your-repo-name>.git
-   ```
-3. Run `npm i` to install dependencies.
-4. Open the project in your editor.
-5. Browse the examples in `/nodes` and `/credentials`. Modify the examples, or replace them with your own nodes.
-6. Update the `package.json` to match your details.
-7. Run `npm run lint` to check for errors or `npm run lintfix` to automatically fix errors when possible.
-8. Test your node locally. Refer to [Run your node locally](https://docs.n8n.io/integrations/creating-nodes/test/run-node-locally/) for guidance.
-9. Replace this README with documentation for your node. Use the [README_TEMPLATE](README_TEMPLATE.md) to get started.
-10. Update the LICENSE file to use your details.
-11. [Publish](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry) your package to npm.
+### Docker
+Add to your `docker-compose.yml`:
+```yaml
+environment:
+  - N8N_COMMUNITY_PACKAGES_ENABLED=true
+```
+Then install via UI or exec into container.
 
-## More information
+## Usage
 
-Refer to our [documentation on creating nodes](https://docs.n8n.io/integrations/creating-nodes/) for detailed information on building your own nodes.
+### Basic Example
+1. Add the **JSON Parser** node to your workflow
+2. Connect it to a node that outputs text (e.g., AI node, HTTP Request)
+3. Configure the **Source Field** (default: `{{ $json.text }}`)
+4. Select an **Extraction Method** (default: Smart Detection)
+5. Execute the workflow
+
+### Common Use Cases
+
+#### Extract JSON from AI Response
+```javascript
+// Input from Gemini/GPT/Claude:
+"Here's the analysis in JSON format:
+```json
+{
+  "sentiment": "positive",
+  "score": 0.85,
+  "keywords": ["innovation", "growth"]
+}
+```
+I hope this helps!"
+
+// Output:
+{
+  "sentiment": "positive",
+  "score": 0.85,
+  "keywords": ["innovation", "growth"]
+}
+```
+
+#### Fix Malformed JSON
+```javascript
+// Input with issues:
+'{
+  "name": "John",
+  "age": 30,     // trailing comma
+  "city": "NYC",
+}'
+
+// Output (with Fix Common Issues enabled):
+{
+  "name": "John",
+  "age": 30,
+  "city": "NYC"
+}
+```
+
+#### Extract Multiple JSON Objects
+Set **Extraction Method** to "All JSON Objects" and **Output Mode** to "New Items":
+```javascript
+// Input:
+"User 1: {"id": 1, "name": "Alice"}
+ User 2: {"id": 2, "name": "Bob"}"
+
+// Output: Two separate items
+// Item 1: {"id": 1, "name": "Alice"}
+// Item 2: {"id": 2, "name": "Bob"}
+```
+
+## Node Parameters
+
+### Basic Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| **Source Field** | string | `{{ $json.text }}` | Expression pointing to the text containing JSON |
+| **Extraction Method** | select | Smart Detection | How to find JSON in the text |
+| **Output Mode** | select | Replace Input | How to return the extracted data |
+| **On Error** | select | Stop Workflow | Error handling behavior |
+
+### Advanced Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| **Strict Mode** | boolean | false | Only accept valid JSON (no fixing) |
+| **Fix Common Issues** | boolean | true | Auto-fix quotes, commas, etc. |
+| **Allow JSON5** | boolean | false | Support relaxed JSON5 syntax |
+| **JSON Schema** | json | - | Optional schema for validation |
+
+### Extraction Methods
+
+- **Smart Detection**: Automatically detects JSON in markdown, plain text, or mixed content
+- **First JSON Object**: Finds the first valid `{...}` structure
+- **Last JSON Object**: Finds the last valid `{...}` structure
+- **All JSON Objects**: Extracts all valid JSON structures
+- **Between Markers**: Extract between custom delimiters
+- **Custom Regex**: Use your own regex pattern
+
+### Output Modes
+
+- **Replace Input**: Returns only the extracted JSON
+- **Add to Input**: Adds extracted JSON as a new field
+- **New Items**: Creates separate items for each JSON object
+
+### Error Handling Options
+
+- **Stop Workflow**: Throws an error and stops execution
+- **Continue with Error**: Adds error info to output and continues
+- **Output Original**: Returns the original input unchanged
+- **Output Empty**: Returns an empty object
+
+## Examples
+
+### With AI Models
+
+```yaml
+Workflow:
+  1. OpenAI Node → Generate structured data
+  2. JSON Parser → Extract JSON from response
+  3. Postgres Node → Store in database
+```
+
+### Data Processing Pipeline
+
+```yaml
+Workflow:
+  1. Webhook Node → Receive mixed content
+  2. JSON Parser → Extract JSON payload
+  3. Transform Node → Process data
+  4. HTTP Request → Send to API
+```
+
+### Log Processing
+
+```yaml
+Workflow:
+  1. Read File → Load log file
+  2. Split in Batches → Process line by line
+  3. JSON Parser → Extract JSON from each line
+  4. Aggregate → Combine results
+```
+
+## AI Agent Tool Usage
+
+This node can be used as a tool by AI Agents:
+
+1. Add an **AI Agent** node to your workflow
+2. Connect the **JSON Parser** node to the Agent's tool input
+3. The AI can now extract JSON from any text it processes
+
+The node includes AI-friendly descriptions for all parameters, making it easy for AI models to understand when and how to use it.
+
+## Development
+
+### Setup
+```bash
+git clone https://github.com/jezweb/n8n-nodes-json-parser.git
+cd n8n-nodes-json-parser
+npm install
+npm run build
+```
+
+### Testing
+```bash
+npm link
+cd ~/.n8n/custom
+npm link n8n-nodes-json-parser
+# Restart n8n
+```
+
+### Contributing
+Pull requests are welcome! Please read our contributing guidelines and ensure:
+- All tests pass
+- Code is linted and formatted
+- Changes are documented
+
+## Troubleshooting
+
+### Node not appearing in n8n
+- Ensure community nodes are enabled
+- Check n8n version compatibility (>= 1.0.0)
+- Restart n8n after installation
+
+### Extraction not working
+- Verify your input contains valid JSON
+- Try different extraction methods
+- Enable "Fix Common Issues" option
+- Check execution logs for detailed errors
+
+### Performance issues
+- Use specific extraction methods instead of Smart Detection
+- Limit input size for large datasets
+- Disable schema validation if not needed
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/jezweb/n8n-nodes-json-parser/issues)
+- **Community**: [n8n Community Forum](https://community.n8n.io)
+- **Email**: jeremy@jezweb.net
 
 ## License
 
-[MIT](https://github.com/n8n-io/n8n-nodes-starter/blob/master/LICENSE.md)
+MIT - See [LICENSE](LICENSE.md) file for details
+
+## Author
+
+**Jeremy Dawes**
+- Website: [jezweb.com.au](https://www.jezweb.com.au)
+- GitHub: [@jezweb](https://github.com/jezweb)
+
+## Acknowledgments
+
+- n8n team for the excellent workflow automation platform
+- Contributors and users of this node
+- AI community for inspiring this tool's creation
