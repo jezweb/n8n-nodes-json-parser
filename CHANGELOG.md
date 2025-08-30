@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2025-08-31
+
+### Added
+- Smart input detection - automatically finds text content when using `{{ $json }}` without specifying a field
+- Helper function to intelligently search for text content in complex objects
+- Better error messages that suggest available fields when text extraction fails
+
+### Changed
+- Default source field now accepts `{{ $json }}` and automatically finds text content
+- Improved handling of complex nested objects from AI responses
+
 ## [0.1.2] - 2025-08-31
 
 ### Fixed

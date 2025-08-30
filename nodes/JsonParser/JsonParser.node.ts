@@ -12,6 +12,125 @@ import * as JSON5 from 'json5';
 import Ajv from 'ajv';
 
 // Helper functions
+function findTextContent(obj: any, visited = new Set()): string | null {
+	// Prevent circular references
+	if (visited.has(obj)) return null;
+	if (typeof obj === 'object' && obj !== null) {
+		visited.add(obj);
+	}
+
+	// If it's already a string, return it
+	if (typeof obj === 'string') {
+		// Check if it looks like it might contain JSON
+		const trimmed = obj.trim();
+		if (trimmed.length > 0 && 
+			(trimmed.includes('{') || trimmed.includes('[') || trimmed.includes('json'))) {
+			return obj;
+		}
+		// Return any non-empty string
+		if (trimmed.length > 0) return obj;
+	}
+
+	// If it's not an object, try to convert to string
+	if (typeof obj !== 'object' || obj === null) {
+		return String(obj);
+	}
+
+	// Check common field names first (in order of likelihood)
+	const commonFields = [
+		'text', 'content', 'message', 'response', 'output', 
+		'body', 'data', 'result', 'value', 'html', 'description',
+		'summary', 'answer', 'reply', 'completion', 'choices'
+	];
+
+	for (const field of commonFields) {
+		if (obj[field]) {
+			const value = obj[field];
+			if (typeof value === 'string' && value.trim().length > 0) {
+				return value;
+			}
+			// Handle nested structures like choices[0].text
+			if (Array.isArray(value) && value.length > 0) {
+				const firstItem = findTextContent(value[0], visited);
+				if (firstItem) return firstItem;
+			}
+			// Recursively check nested objects
+			if (typeof value === 'object') {
+				const nested = findTextContent(value, visited);
+				if (nested) return nested;
+			}
+		}
+	}
+
+	// Handle arrays - check first few items
+	if (Array.isArray(obj)) {
+		for (let i = 0; i < Math.min(obj.length, 5); i++) {
+			const itemText = findTextContent(obj[i], visited);
+			if (itemText) return itemText;
+		}
+	}
+
+	// Check for 'parts' array (common in AI responses)
+	if (obj.parts && Array.isArray(obj.parts)) {
+		for (const part of obj.parts) {
+			const partText = findTextContent(part, visited);
+			if (partText) return partText;
+		}
+	}
+
+	// Search all string fields recursively
+	for (const key in obj) {
+		if (obj.hasOwnProperty(key)) {
+			const value = obj[key];
+			if (typeof value === 'string' && value.trim().length > 0) {
+				// Prefer longer strings that might contain JSON
+				if (value.length > 50 || value.includes('{') || value.includes('[')) {
+					return value;
+				}
+			}
+		}
+	}
+
+	// Last resort: search nested objects
+	for (const key in obj) {
+		if (obj.hasOwnProperty(key) && typeof obj[key] === 'object') {
+			const nested = findTextContent(obj[key], visited);
+			if (nested) return nested;
+		}
+	}
+
+	return null;
+}
+
+function getAvailableFields(obj: any, prefix = '', maxDepth = 3): string[] {
+	const fields: string[] = [];
+	
+	if (maxDepth <= 0 || typeof obj !== 'object' || obj === null) {
+		return fields;
+	}
+
+	for (const key in obj) {
+		if (obj.hasOwnProperty(key)) {
+			const fullPath = prefix ? `${prefix}.${key}` : key;
+			const value = obj[key];
+			
+			if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+				fields.push(fullPath);
+			} else if (Array.isArray(value) && value.length > 0) {
+				fields.push(`${fullPath}[0]`);
+				// Check first item of array
+				if (typeof value[0] === 'object') {
+					fields.push(...getAvailableFields(value[0], `${fullPath}[0]`, maxDepth - 1));
+				}
+			} else if (typeof value === 'object') {
+				fields.push(...getAvailableFields(value, fullPath, maxDepth - 1));
+			}
+		}
+	}
+	
+	return fields;
+}
+
 function smartDetection(text: string, options: IDataObject): string[] {
 	const results: string[] = [];
 	
@@ -193,10 +312,10 @@ export class JsonParser implements INodeType {
 				displayName: 'Source Field',
 				name: 'sourceField',
 				type: 'string',
-				default: '={{ $json.text }}',
+				default: '={{ $json }}',
 				required: true,
 				placeholder: '{{ $json.content.parts[0].text }}',
-				description: 'The field containing the text with JSON to extract. Use an expression to point to your data, e.g., {{ $JSON.response }} for AI outputs.',
+				description: 'The field containing the text with JSON to extract. Use {{ $JSON }} for auto-detection, or specify a path like {{ $JSON.text }} or {{ $JSON.content }}. The node will intelligently search for text content when using {{ $JSON }}',
 			},
 			{
 				displayName: 'Extraction Method',
@@ -404,11 +523,30 @@ export class JsonParser implements INodeType {
 
 				// Evaluate the expression to get the actual text value
 				let text: any;
+				let evaluatedValue: any;
+				
 				try {
 					// Try to evaluate the expression
 					if (sourceFieldExpression.includes('{{') && sourceFieldExpression.includes('}}')) {
 						// It's an expression, evaluate it
-						text = this.evaluateExpression(sourceFieldExpression, itemIndex) as string;
+						evaluatedValue = this.evaluateExpression(sourceFieldExpression, itemIndex);
+						
+						// If the expression is {{ $json }} or similar, try smart detection
+						if (sourceFieldExpression.trim() === '{{ $json }}' || 
+							sourceFieldExpression.trim() === '{{$json}}' ||
+							typeof evaluatedValue === 'object') {
+							
+							// Try to find text content intelligently
+							const foundText = findTextContent(evaluatedValue);
+							if (foundText) {
+								text = foundText;
+							} else {
+								// If no text found, stringify the entire object
+								text = JSON.stringify(evaluatedValue);
+							}
+						} else {
+							text = evaluatedValue;
+						}
 					} else {
 						// It might be a direct field name or static text
 						text = sourceFieldExpression;
@@ -416,19 +554,41 @@ export class JsonParser implements INodeType {
 				} catch (error) {
 					// If expression evaluation fails, try to get it from the input data
 					const inputData = items[itemIndex].json;
-					text = inputData[sourceFieldExpression] || sourceFieldExpression;
+					
+					// Try smart detection on the input data
+					const foundText = findTextContent(inputData);
+					if (foundText) {
+						text = foundText;
+					} else {
+						text = inputData[sourceFieldExpression] || sourceFieldExpression;
+					}
 				}
 
 				// Ensure text is a string
 				if (typeof text !== 'string') {
 					if (text === undefined || text === null) {
+						// Get available fields for better error message
+						const inputData = items[itemIndex].json;
+						const availableFields = getAvailableFields(inputData);
+						const fieldList = availableFields.slice(0, 10).map(f => `$json.${f}`).join(', ');
+						
 						throw new NodeOperationError(
 							this.getNode(),
-							`Source field is empty or undefined`,
+							`No text content found in the input. Try specifying a field like {{ $json.text }} or {{ $json.content }}.\n\nAvailable fields: ${fieldList}${availableFields.length > 10 ? ', ...' : ''}`,
 							{ itemIndex }
 						);
 					}
-					text = JSON.stringify(text);
+					// If it's an object but not null/undefined, try one more time to find text
+					if (typeof text === 'object') {
+						const foundText = findTextContent(text);
+						if (foundText) {
+							text = foundText;
+						} else {
+							text = JSON.stringify(text);
+						}
+					} else {
+						text = String(text);
+					}
 				}
 
 				// Extract JSON based on method

@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-json-parser",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "n8n node for extracting and parsing JSON from text, including AI model outputs",
   "keywords": [
     "n8n-community-node-package",
