@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2025-08-31
+
+### Fixed
+- Icon not displaying in n8n - icon file is now copied to the correct location in dist/nodes/JsonParser/
+
 ## [0.1.0] - 2025-08-30
 
 ### Added
