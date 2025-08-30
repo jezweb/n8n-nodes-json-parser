@@ -196,7 +196,7 @@ export class JsonParser implements INodeType {
 				default: '={{ $json.text }}',
 				required: true,
 				placeholder: '{{ $json.content.parts[0].text }}',
-				description: 'The field containing the text with JSON to extract. Use an expression to point to your data, e.g., {{ $json.response }} for AI outputs.',
+				description: 'The field containing the text with JSON to extract. Use an expression to point to your data, e.g., {{ $JSON.response }} for AI outputs.',
 			},
 			{
 				displayName: 'Extraction Method',
@@ -204,38 +204,38 @@ export class JsonParser implements INodeType {
 				type: 'options',
 				options: [
 					{
-						name: 'Smart Detection',
-						value: 'smart',
-						description: 'Automatically detect JSON in markdown blocks, plain text, or mixed content. Best for AI outputs.',
-					},
-					{
-						name: 'First JSON Object',
-						value: 'first',
-						description: 'Extract the first valid JSON object {...} found in the text.',
-					},
-					{
-						name: 'Last JSON Object',
-						value: 'last',
-						description: 'Extract the last valid JSON object {...} found in the text.',
-					},
-					{
 						name: 'All JSON Objects',
 						value: 'all',
-						description: 'Extract all valid JSON objects found in the text as an array.',
+						description: 'Extract all valid JSON objects found in the text as an array',
 					},
 					{
 						name: 'Between Markers',
 						value: 'markers',
-						description: 'Extract JSON between custom start and end markers.',
+						description: 'Extract JSON between custom start and end markers',
 					},
 					{
 						name: 'Custom Regex',
 						value: 'regex',
-						description: 'Use a custom regular expression pattern to extract JSON.',
+						description: 'Use a custom regular expression pattern to extract JSON',
+					},
+					{
+						name: 'First JSON Object',
+						value: 'first',
+						description: 'Extract the first valid JSON object {...} found in the text',
+					},
+					{
+						name: 'Last JSON Object',
+						value: 'last',
+						description: 'Extract the last valid JSON object {...} found in the text',
+					},
+					{
+						name: 'Smart Detection',
+						value: 'smart',
+						description: 'Automatically detect JSON in markdown blocks, plain text, or mixed content. Best for AI outputs.',
 					},
 				],
 				default: 'smart',
-				description: 'Method to use for finding JSON in the text.',
+				description: 'Method to use for finding JSON in the text',
 			},
 			{
 				displayName: 'Output Mode',
@@ -245,21 +245,21 @@ export class JsonParser implements INodeType {
 					{
 						name: 'Replace Input',
 						value: 'replace',
-						description: 'Replace the entire input with the extracted JSON.',
+						description: 'Replace the entire input with the extracted JSON',
 					},
 					{
 						name: 'Add to Input',
 						value: 'add',
-						description: 'Add the extracted JSON as a new field to the existing input.',
+						description: 'Add the extracted JSON as a new field to the existing input',
 					},
 					{
 						name: 'New Items',
 						value: 'items',
-						description: 'Create new items for each extracted JSON object (useful with "All JSON Objects").',
+						description: 'Create new items for each extracted JSON object (useful with "All JSON Objects")',
 					},
 				],
 				default: 'replace',
-				description: 'How to output the extracted JSON data.',
+				description: 'How to output the extracted JSON data',
 			},
 			{
 				displayName: 'Output Field Name',
@@ -271,7 +271,7 @@ export class JsonParser implements INodeType {
 						outputMode: ['add'],
 					},
 				},
-				description: 'Name of the field to add the extracted JSON to.',
+				description: 'Name of the field to add the extracted JSON to',
 			},
 			// Marker Options
 			{
@@ -284,7 +284,7 @@ export class JsonParser implements INodeType {
 						extractionMethod: ['markers'],
 					},
 				},
-				description: 'Text that marks the beginning of JSON content.',
+				description: 'Text that marks the beginning of JSON content',
 			},
 			{
 				displayName: 'End Marker',
@@ -296,7 +296,7 @@ export class JsonParser implements INodeType {
 						extractionMethod: ['markers'],
 					},
 				},
-				description: 'Text that marks the end of JSON content.',
+				description: 'Text that marks the end of JSON content',
 			},
 			// Regex Options
 			{
@@ -320,39 +320,39 @@ export class JsonParser implements INodeType {
 				default: {},
 				options: [
 					{
-						displayName: 'Strict Mode',
-						name: 'strictMode',
+						displayName: 'Allow JSON5',
+						name: 'allowJson5',
 						type: 'boolean',
 						default: false,
-						description: 'Whether to require valid JSON without any fixing attempts.',
+						description: 'Whether to support JSON5 format (trailing commas, comments, unquoted keys, etc.)',
 					},
 					{
 						displayName: 'Fix Common Issues',
 						name: 'fixIssues',
 						type: 'boolean',
 						default: true,
-						description: 'Whether to automatically fix common JSON issues like smart quotes, trailing commas, etc.',
-					},
-					{
-						displayName: 'Allow JSON5',
-						name: 'allowJson5',
-						type: 'boolean',
-						default: false,
-						description: 'Whether to support JSON5 format (trailing commas, comments, unquoted keys, etc.).',
-					},
-					{
-						displayName: 'JSON Schema',
-						name: 'jsonSchema',
-						type: 'json',
-						default: '',
-						description: 'Optional JSON schema to validate the extracted data against.',
+						description: 'Whether to automatically fix common JSON issues like smart quotes, trailing commas, etc',
 					},
 					{
 						displayName: 'Include Arrays',
 						name: 'includeArrays',
 						type: 'boolean',
 						default: true,
-						description: 'Whether to also extract JSON arrays [...] in addition to objects.',
+						description: 'Whether to also extract JSON arrays [...] in addition to objects',
+					},
+					{
+						displayName: 'JSON Schema',
+						name: 'jsonSchema',
+						type: 'json',
+						default: '',
+						description: 'Optional JSON schema to validate the extracted data against',
+					},
+					{
+						displayName: 'Strict Mode',
+						name: 'strictMode',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to require valid JSON without any fixing attempts',
 					},
 				],
 			},
@@ -365,26 +365,26 @@ export class JsonParser implements INodeType {
 					{
 						name: 'Stop Workflow',
 						value: 'error',
-						description: 'Throw an error and stop the workflow execution.',
+						description: 'Throw an error and stop the workflow execution',
 					},
 					{
 						name: 'Continue with Error',
 						value: 'continueWithError',
-						description: 'Output an error message but continue processing.',
+						description: 'Output an error message but continue processing',
 					},
 					{
 						name: 'Output Original',
 						value: 'outputOriginal',
-						description: 'Output the original input unchanged.',
+						description: 'Output the original input unchanged',
 					},
 					{
 						name: 'Output Empty',
 						value: 'outputEmpty',
-						description: 'Output an empty object or array.',
+						description: 'Output an empty object or array',
 					},
 				],
 				default: 'error',
-				description: 'What to do when JSON extraction or parsing fails.',
+				description: 'What to do when JSON extraction or parsing fails',
 			},
 		],
 	};
