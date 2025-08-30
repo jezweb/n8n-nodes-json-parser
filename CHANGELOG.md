@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2025-08-31
+
+### Fixed
+- Critical bug: Fixed expression evaluation in source field - the node now properly evaluates n8n expressions like `{{ $json.text }}` instead of treating them as literal strings
+- Added better error handling for undefined or null source fields
+
 ## [0.1.1] - 2025-08-31
 
 ### Fixed

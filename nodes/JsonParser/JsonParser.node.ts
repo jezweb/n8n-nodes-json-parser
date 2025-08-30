@@ -397,14 +397,37 @@ export class JsonParser implements INodeType {
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			try {
 				// Get parameters
-				const sourceField = this.getNodeParameter('sourceField', itemIndex) as string;
+				const sourceFieldExpression = this.getNodeParameter('sourceField', itemIndex) as string;
 				const extractionMethod = this.getNodeParameter('extractionMethod', itemIndex) as string;
 				const outputMode = this.getNodeParameter('outputMode', itemIndex) as string;
 				const options = this.getNodeParameter('options', itemIndex, {}) as IDataObject;
 
-				// Get source text
-				let text = sourceField;
+				// Evaluate the expression to get the actual text value
+				let text: any;
+				try {
+					// Try to evaluate the expression
+					if (sourceFieldExpression.includes('{{') && sourceFieldExpression.includes('}}')) {
+						// It's an expression, evaluate it
+						text = this.evaluateExpression(sourceFieldExpression, itemIndex) as string;
+					} else {
+						// It might be a direct field name or static text
+						text = sourceFieldExpression;
+					}
+				} catch (error) {
+					// If expression evaluation fails, try to get it from the input data
+					const inputData = items[itemIndex].json;
+					text = inputData[sourceFieldExpression] || sourceFieldExpression;
+				}
+
+				// Ensure text is a string
 				if (typeof text !== 'string') {
+					if (text === undefined || text === null) {
+						throw new NodeOperationError(
+							this.getNode(),
+							`Source field is empty or undefined`,
+							{ itemIndex }
+						);
+					}
 					text = JSON.stringify(text);
 				}
 
