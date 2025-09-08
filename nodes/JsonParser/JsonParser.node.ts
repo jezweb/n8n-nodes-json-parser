@@ -480,6 +480,13 @@ export class JsonParser implements INodeType {
 						description: 'Whether to support JSON5 format (trailing commas, comments, unquoted keys, etc.)',
 					},
 					{
+						displayName: 'Auto-Stringify for Expressions',
+						name: 'autoStringify',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to automatically stringify nested objects and arrays so they display as JSON when dragged into expression fields (instead of [object Object])',
+					},
+					{
 						displayName: 'Fix Common Issues',
 						name: 'fixIssues',
 						type: 'boolean',
@@ -506,13 +513,6 @@ export class JsonParser implements INodeType {
 						type: 'boolean',
 						default: false,
 						description: 'Whether to require valid JSON without any fixing attempts',
-					},
-					{
-						displayName: 'Auto-Stringify for Expressions',
-						name: 'autoStringify',
-						type: 'boolean',
-						default: false,
-						description: 'Whether to automatically stringify nested objects and arrays so they display as JSON when dragged into expression fields (instead of [object Object])',
 					},
 				],
 			},
