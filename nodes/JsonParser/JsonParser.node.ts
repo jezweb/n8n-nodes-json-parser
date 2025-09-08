@@ -132,24 +132,28 @@ function getAvailableFields(obj: any, prefix = '', maxDepth = 3): string[] {
 }
 
 function smartDetection(text: string, options: IDataObject): string[] {
-	const results: string[] = [];
+	const foundJsonStrings = new Set<string>();
 	
-	// Try markdown code blocks first
+	// First, extract JSON from markdown code blocks
 	const markdownPattern = /```(?:json)?\s*([\s\S]*?)```/g;
 	let match;
+	let textWithoutMarkdown = text;
+	
 	while ((match = markdownPattern.exec(text)) !== null) {
 		const content = match[1].trim();
 		if (looksLikeJson(content)) {
-			results.push(content);
+			foundJsonStrings.add(content);
+			// Remove the markdown block from the text to avoid duplicate extraction
+			textWithoutMarkdown = textWithoutMarkdown.replace(match[0], ' ');
 		}
 	}
 	
-	// If no markdown blocks, try to find JSON objects/arrays
-	if (results.length === 0) {
-		results.push(...findAllJson(text, options));
-	}
+	// Then, find any additional JSON objects/arrays outside markdown blocks
+	const additionalJson = findAllJson(textWithoutMarkdown, options);
+	additionalJson.forEach(json => foundJsonStrings.add(json));
 	
-	return results;
+	// Convert Set back to array to maintain unique JSON objects
+	return Array.from(foundJsonStrings);
 }
 
 function findFirstJson(text: string, options: IDataObject): string | null {
@@ -163,30 +167,97 @@ function findLastJson(text: string, options: IDataObject): string | null {
 }
 
 function findAllJson(text: string, options: IDataObject): string[] {
-	const results: string[] = [];
 	const includeArrays = options.includeArrays !== false;
+	const foundJsons = new Set<string>();
 	
-	// Find all potential JSON objects
-	const objectPattern = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
-	let match;
-	while ((match = objectPattern.exec(text)) !== null) {
-		if (isValidJsonString(match[0], options)) {
-			results.push(match[0]);
+	// Improved method: Find JSON by looking for balanced braces/brackets
+	// This handles deeply nested structures better
+	
+	// First, try to find JSON objects
+	let braceCount = 0;
+	let startIndex = -1;
+	let inString = false;
+	let escapeNext = false;
+	
+	for (let i = 0; i < text.length; i++) {
+		const char = text[i];
+		
+		// Handle string boundaries (to ignore braces inside strings)
+		if (char === '"' && !escapeNext) {
+			inString = !inString;
+		}
+		
+		// Handle escape characters
+		if (char === '\\' && !escapeNext) {
+			escapeNext = true;
+			continue;
+		} else {
+			escapeNext = false;
+		}
+		
+		// Skip if we're inside a string
+		if (inString) continue;
+		
+		// Track opening and closing braces
+		if (char === '{') {
+			if (braceCount === 0) {
+				startIndex = i;
+			}
+			braceCount++;
+		} else if (char === '}') {
+			braceCount--;
+			if (braceCount === 0 && startIndex !== -1) {
+				const jsonCandidate = text.substring(startIndex, i + 1);
+				if (isValidJsonString(jsonCandidate, options)) {
+					foundJsons.add(jsonCandidate);
+				}
+				startIndex = -1;
+			}
 		}
 	}
 	
-	// Find all potential JSON arrays if enabled
+	// Similarly for arrays if enabled
 	if (includeArrays) {
-		const arrayPattern = /\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\]/g;
-		text.replace(arrayPattern, (matchStr) => {
-			if (isValidJsonString(matchStr, options) && !results.includes(matchStr)) {
-				results.push(matchStr);
+		let bracketCount = 0;
+		startIndex = -1;
+		inString = false;
+		escapeNext = false;
+		
+		for (let i = 0; i < text.length; i++) {
+			const char = text[i];
+			
+			if (char === '"' && !escapeNext) {
+				inString = !inString;
 			}
-			return matchStr;
-		});
+			
+			if (char === '\\' && !escapeNext) {
+				escapeNext = true;
+				continue;
+			} else {
+				escapeNext = false;
+			}
+			
+			if (inString) continue;
+			
+			if (char === '[') {
+				if (bracketCount === 0) {
+					startIndex = i;
+				}
+				bracketCount++;
+			} else if (char === ']') {
+				bracketCount--;
+				if (bracketCount === 0 && startIndex !== -1) {
+					const jsonCandidate = text.substring(startIndex, i + 1);
+					if (isValidJsonString(jsonCandidate, options)) {
+						foundJsons.add(jsonCandidate);
+					}
+					startIndex = -1;
+				}
+			}
+		}
 	}
 	
-	return results;
+	return Array.from(foundJsons);
 }
 
 function extractBetweenMarkers(text: string, startMarker: string, endMarker: string): string | null {
@@ -291,18 +362,24 @@ function fixCommonIssues(jsonString: string): string {
 	return fixed;
 }
 
-function stringifyNestedObjects(obj: any): any {
+function stringifyNestedObjects(obj: any, depth: number = 0, maxDepth: number = 1): any {
 	// If it's not an object or array, return as-is
 	if (typeof obj !== 'object' || obj === null) {
 		return obj;
 	}
 	
+	// Only stringify objects/arrays that are nested deeper than maxDepth
+	// This preserves the top-level structure while making nested content accessible
+	if (depth > maxDepth) {
+		return JSON.stringify(obj);
+	}
+	
 	// Handle arrays
 	if (Array.isArray(obj)) {
 		return obj.map(item => {
-			// For each item in array, if it's an object/array, stringify it
+			// Recursively process array items
 			if (typeof item === 'object' && item !== null) {
-				return JSON.stringify(item);
+				return stringifyNestedObjects(item, depth + 1, maxDepth);
 			}
 			return item;
 		});
@@ -313,9 +390,9 @@ function stringifyNestedObjects(obj: any): any {
 	for (const key in obj) {
 		if (obj.hasOwnProperty(key)) {
 			const value = obj[key];
-			// If the value is an object or array, stringify it
+			// Recursively process object values
 			if (typeof value === 'object' && value !== null) {
-				result[key] = JSON.stringify(value);
+				result[key] = stringifyNestedObjects(value, depth + 1, maxDepth);
 			} else {
 				result[key] = value;
 			}
@@ -372,6 +449,11 @@ export class JsonParser implements INodeType {
 						description: 'Use a custom regular expression pattern to extract JSON',
 					},
 					{
+						name: 'Exhaustive',
+						value: 'exhaustive',
+						description: 'Extract ALL JSON from markdown blocks AND inline text. Ensures nothing is missed. Best for complex AI outputs with multiple JSON objects.',
+					},
+					{
 						name: 'First JSON Object',
 						value: 'first',
 						description: 'Extract the first valid JSON object {...} found in the text',
@@ -384,7 +466,7 @@ export class JsonParser implements INodeType {
 					{
 						name: 'Smart Detection',
 						value: 'smart',
-						description: 'Automatically detect JSON in markdown blocks, plain text, or mixed content. Best for AI outputs.',
+						description: 'Automatically detect JSON in markdown blocks and plain text. Good for typical AI outputs.',
 					},
 				],
 				default: 'smart',
@@ -638,6 +720,16 @@ export class JsonParser implements INodeType {
 				switch (extractionMethod) {
 					case 'smart':
 						extractedJsonStrings = smartDetection(text, options);
+						break;
+					case 'exhaustive':
+						// Exhaustive mode: captures everything possible
+						// Uses same logic as smart detection which now captures all JSON
+						extractedJsonStrings = smartDetection(text, options);
+						// If nothing found with smart detection, try with more aggressive options
+						if (extractedJsonStrings.length === 0) {
+							const aggressiveOptions = { ...options, fixIssues: true, allowJson5: true };
+							extractedJsonStrings = smartDetection(text, aggressiveOptions);
+						}
 						break;
 					case 'first':
 						const first = findFirstJson(text, options);
