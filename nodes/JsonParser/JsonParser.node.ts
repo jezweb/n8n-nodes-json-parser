@@ -291,6 +291,40 @@ function fixCommonIssues(jsonString: string): string {
 	return fixed;
 }
 
+function stringifyNestedObjects(obj: any): any {
+	// If it's not an object or array, return as-is
+	if (typeof obj !== 'object' || obj === null) {
+		return obj;
+	}
+	
+	// Handle arrays
+	if (Array.isArray(obj)) {
+		return obj.map(item => {
+			// For each item in array, if it's an object/array, stringify it
+			if (typeof item === 'object' && item !== null) {
+				return JSON.stringify(item);
+			}
+			return item;
+		});
+	}
+	
+	// Handle objects
+	const result: IDataObject = {};
+	for (const key in obj) {
+		if (obj.hasOwnProperty(key)) {
+			const value = obj[key];
+			// If the value is an object or array, stringify it
+			if (typeof value === 'object' && value !== null) {
+				result[key] = JSON.stringify(value);
+			} else {
+				result[key] = value;
+			}
+		}
+	}
+	
+	return result;
+}
+
 export class JsonParser implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'JSON Parser',
@@ -473,6 +507,13 @@ export class JsonParser implements INodeType {
 						default: false,
 						description: 'Whether to require valid JSON without any fixing attempts',
 					},
+					{
+						displayName: 'Auto-Stringify for Expressions',
+						name: 'autoStringify',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to automatically stringify nested objects and arrays so they display as JSON when dragged into expression fields (instead of [object Object])',
+					},
 				],
 			},
 			// Error Handling
@@ -654,17 +695,25 @@ export class JsonParser implements INodeType {
 					parsedJsonObjects.push(parsed as IDataObject);
 				}
 
+				// Apply auto-stringify if enabled
+				const autoStringify = options.autoStringify === true;
+				let outputObjects = parsedJsonObjects;
+				
+				if (autoStringify) {
+					outputObjects = parsedJsonObjects.map(obj => stringifyNestedObjects(obj));
+				}
+
 				// Output based on mode
 				if (outputMode === 'replace') {
 					// Replace entire input with extracted JSON
-					if (parsedJsonObjects.length === 1) {
+					if (outputObjects.length === 1) {
 						returnData.push({
-							json: parsedJsonObjects[0],
+							json: outputObjects[0],
 							pairedItem: { item: itemIndex },
 						});
 					} else {
 						returnData.push({
-							json: { extracted: parsedJsonObjects },
+							json: { extracted: outputObjects },
 							pairedItem: { item: itemIndex },
 						});
 					}
@@ -673,7 +722,7 @@ export class JsonParser implements INodeType {
 					const outputFieldName = this.getNodeParameter('outputFieldName', itemIndex, 'extractedJson') as string;
 					const newItem = {
 						...items[itemIndex].json,
-						[outputFieldName]: parsedJsonObjects.length === 1 ? parsedJsonObjects[0] : parsedJsonObjects,
+						[outputFieldName]: outputObjects.length === 1 ? outputObjects[0] : outputObjects,
 					};
 					returnData.push({
 						json: newItem,
@@ -681,7 +730,7 @@ export class JsonParser implements INodeType {
 					});
 				} else if (outputMode === 'items') {
 					// Create new items for each extracted JSON
-					for (const jsonObj of parsedJsonObjects) {
+					for (const jsonObj of outputObjects) {
 						returnData.push({
 							json: jsonObj,
 							pairedItem: { item: itemIndex },
